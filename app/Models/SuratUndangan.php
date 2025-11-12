@@ -20,7 +20,8 @@ class SuratUndangan extends Model
 {
     return $this->belongsToMany(Penerima::class, 'surat_penerima','surat_undangan_id', 'penerima_id')
                 ->withPivot('status_kirim')
-                ->withTimestamps();
+                ->withTimestamps()
+                ->distinct(); // 🔥 ini mencegah hasil duplikat
 }
 
 }

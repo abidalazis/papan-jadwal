@@ -6,22 +6,15 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\DeleteAction;
-use Filament\Tables\Actions\DetachAction;
-use Illuminate\Database\Eloquent\Builder;
 use Filament\Actions;
-
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
-
+use Carbon\Carbon;
 
 class PenerimasRelationManager extends RelationManager
 {
-    // nama relasi sesuai method di model SuratUndangan
     protected static string $relationship = 'penerimas';
-
     protected static ?string $recordTitleAttribute = 'nama';
     protected static ?string $title = 'Daftar Penerima';
 
@@ -29,13 +22,24 @@ class PenerimasRelationManager extends RelationManager
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('nama')->label('Nama')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('nomor_hp')->label('Nomor HP'),
-                Tables\Columns\TextColumn::make('jabatan')->label('Jabatan'),
-                Tables\Columns\TextColumn::make('pivot.status_kirim')
+                Tables\Columns\TextColumn::make('nama')
+                    ->label('Nama')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('nomor_hp')
+                    ->label('Nomor HP')
+                    ->copyable()
+                    ->copyMessage('Nomor tersalin!')
+                    ->icon('heroicon-o-phone'),
+                Tables\Columns\TextColumn::make('jabatan')
+                    ->label('Jabatan'),
+                Tables\Columns\IconColumn::make('pivot.status_kirim')
                     ->label('Status Kirim')
-                    ->formatStateUsing(fn ($state) => $state ? 'Terkirim' : 'Belum')
-                    ->toggleable(false),
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('danger'),
             ])
             ->headerActions([
                 Actions\Action::make('tambahPenerima')
@@ -73,7 +77,59 @@ class PenerimasRelationManager extends RelationManager
                             ->send();
                     }),
             ])
-            ->recordActions([ // Ganti dari ->actions()
+            ->recordActions([
+                Actions\Action::make('kirim_wa')
+                    ->label('Kirim WA')
+                    ->icon('heroicon-o-chat-bubble-left-right')
+                    ->color('success')
+                    ->url(function ($record, $livewire) {
+                        $undangan = $livewire->getOwnerRecord();
+                        
+                        // Format nomor HP
+                        $nomorHP = preg_replace('/[^0-9]/', '', $record->nomor_hp);
+                        if (substr($nomorHP, 0, 1) === '0') {
+                            $nomorHP = '62' . substr($nomorHP, 1);
+                        }
+                        if (substr($nomorHP, 0, 2) !== '62') {
+                            $nomorHP = '62' . $nomorHP;
+                        }
+                        
+                        // Format pesan
+                        $pesan = $this->formatPesan($undangan, $record);
+                        $pesanEncoded = urlencode($pesan);
+                        
+                        return "https://wa.me/{$nomorHP}?text={$pesanEncoded}";
+                    }, shouldOpenInNewTab: true)
+                    ->after(function ($record, $livewire) {
+                        // Update status kirim
+                        $livewire->ownerRecord->penerimas()->updateExistingPivot($record->id, [
+                            'status_kirim' => true
+                        ]);
+                        
+                        Notification::make()
+                            ->title('Link WhatsApp dibuka')
+                            ->body('Status kirim diupdate menjadi terkirim')
+                            ->success()
+                            ->send();
+                    }),
+                    
+                Actions\Action::make('toggle_status')
+                    ->label(fn ($record) => $record->pivot->status_kirim ? 'Tandai Belum Kirim' : 'Tandai Terkirim')
+                    ->icon(fn ($record) => $record->pivot->status_kirim ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle')
+                    ->color(fn ($record) => $record->pivot->status_kirim ? 'warning' : 'success')
+                    ->action(function ($record, $livewire) {
+                        $newStatus = !$record->pivot->status_kirim;
+                        $livewire->ownerRecord->penerimas()->updateExistingPivot($record->id, [
+                            'status_kirim' => $newStatus
+                        ]);
+
+                        Notification::make()
+                            ->title('Status berhasil diubah')
+                            ->body($newStatus ? 'Ditandai sebagai terkirim' : 'Ditandai sebagai belum kirim')
+                            ->success()
+                            ->send();
+                    }),
+                    
                 Actions\Action::make('hapus')
                     ->label('Hapus dari Daftar')
                     ->icon('heroicon-o-trash')
@@ -88,6 +144,21 @@ class PenerimasRelationManager extends RelationManager
                             ->send();
                     }),
             ])
-            ->bulkActions([]); // Ganti dari ->bulkActions([])
+            ->bulkActions([]);
+    }
+    
+    protected function formatPesan($undangan, $penerima): string
+    {
+        $tanggal = Carbon::parse($undangan->tanggal_acara)->locale('id')->isoFormat('dddd, D MMMM Y');
+        
+        return "🔔 *PENGINGAT UNDANGAN*\n\n" .
+               "Yth. {$penerima->nama}" . ($penerima->jabatan ? " ({$penerima->jabatan})" : "") . "\n\n" .
+               "Mengingatkan bahwa akan ada acara:\n\n" .
+               "📋 *Acara:* {$undangan->judul}\n" .
+               "📅 *Tanggal:* {$tanggal}\n" .
+               "📍 *Lokasi:* " . ($undangan->lokasi ?? '-') . "\n" .
+               ($undangan->keterangan ? "\n📝 *Keterangan:* {$undangan->keterangan}\n" : "") .
+               "\n\nMohon kehadirannya. Terima kasih.\n\n" .
+               "_Pesan ini dikirim otomatis dari Sistem Papan Jadwal Surat_";
     }
 }
