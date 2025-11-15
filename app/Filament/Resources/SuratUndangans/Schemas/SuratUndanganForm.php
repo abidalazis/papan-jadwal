@@ -7,6 +7,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\DateTimePicker;
 
 class SuratUndanganForm
 {
@@ -19,7 +20,7 @@ class SuratUndanganForm
                     ->unique(ignorable: fn ($record) => $record), // <--- kunci unik,
                 TextInput::make('judul')
                     ->required(),
-                    DatePicker::make('tanggal_acara')
+                DateTimePicker::make('tanggal_acara')
                     ->label('Tanggal Acara')
                     ->required(),
                 TextInput::make('lokasi')

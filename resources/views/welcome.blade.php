@@ -151,6 +151,7 @@
         @endif
 
         <!-- Kalender Bulan Ini -->
+        <!-- Kalender Bulan Ini -->
         <div class="bg-white rounded-2xl shadow-xl p-8">
             <div class="flex items-center justify-between mb-8">
                 <div class="flex items-center space-x-3">
@@ -192,7 +193,13 @@
                     // Days with events
                     for($day = 1; $day <= $daysInMonth; $day++) {
                         $currentDate = \Carbon\Carbon::now()->startOfMonth()->addDays($day - 1);
-                        $eventsOnDay = $kalenderUndangan->where('tanggal_acara', $currentDate->format('Y-m-d'));
+                        $currentDateString = $currentDate->format('Y-m-d');
+                        
+                        // PERBAIKAN: Filter berdasarkan tanggal_only yang sudah kita buat di controller
+                        $eventsOnDay = $kalenderUndangan->filter(function($undangan) use ($currentDateString) {
+                            return $undangan->tanggal_only === $currentDateString;
+                        });
+                        
                         $isToday = $currentDate->isToday();
                         $isTomorrow = $currentDate->isTomorrow();
                 @endphp

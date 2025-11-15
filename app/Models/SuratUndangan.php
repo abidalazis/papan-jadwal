@@ -16,6 +16,9 @@ class SuratUndangan extends Model
         'tanggal_acara',
         'lokasi',
     ];
+    protected $casts = [
+        'tanggal_acara' => 'datetime', // Ganti 'nama_kolom_anda'
+    ];
     public function penerimas()
 {
     return $this->belongsToMany(Penerima::class, 'surat_penerima','surat_undangan_id', 'penerima_id')

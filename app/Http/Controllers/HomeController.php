@@ -17,10 +17,17 @@ class HomeController extends Controller
             ->get();
 
         // Ambil semua undangan bulan ini untuk kalender
+        // PERBAIKAN: Gunakan selectRaw untuk extract date dari datetime
         $kalenderUndangan = SuratUndangan::whereMonth('tanggal_acara', Carbon::now()->month)
             ->whereYear('tanggal_acara', Carbon::now()->year)
+            ->with('penerimas')
             ->orderBy('tanggal_acara')
-            ->get();
+            ->get()
+            ->map(function($undangan) {
+                // Tambahkan property tanggal_only untuk memudahkan perbandingan
+                $undangan->tanggal_only = Carbon::parse($undangan->tanggal_acara)->format('Y-m-d');
+                return $undangan;
+            });
 
         return view('welcome', compact('undanganBesok', 'kalenderUndangan'));
     }
